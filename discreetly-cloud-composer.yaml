@@ -1,0 +1,80 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: discreetly
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discreetly
+  template:
+    metadata:
+      labels:
+        app: discreetly
+    spec:
+      volumes:
+      - name: discreetly-config-vol
+        configMap:
+          name: discreetly-config
+          items:
+              - key: settings.py
+                path: settings.py
+      containers:
+      - name: discreetly
+        image: fandom/discreetly:latest
+        imagePullPolicy: Always
+        env:
+        - name: AIRFLOW_DB_HOST
+          value: "airflow-sqlproxy-service"
+        - name: AIRFLOW_USERNAME
+          value: "root"
+        - name: AIRFLOW_PASSWORD
+          value: ""
+        - name: AIRFLOW_DATABASE
+          value: "airflow-db"
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        volumeMounts:
+          - name: discreetly-config-vol
+            mountPath: /app/config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discreetly
+spec:
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+  type: NodePort
+  selector:
+    app: discreetly
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: discreetly-config
+data:
+  settings.py: |
+    import os
+
+    ENV_VAR_PREFIX = os.getenv('ENV_VAR_PREFIX', '')
+    DEBUG = not 'PROD' in ENV_VAR_PREFIX
+    AIRFLOW_DB_HOST = os.environ['AIRFLOW_DB_HOST']
+    AIRFLOW_USERNAME = os.environ['AIRFLOW_USERNAME']
+    AIRFLOW_PASSWORD = os.environ['AIRFLOW_PASSWORD']
+    AIRFLOW_DATABASE = os.environ['AIRFLOW_DATABASE']
+    SECRET_KEY = os.environ.get('SECRET_KEY') or '8FF5F14DC7DBF90FDE769C3BF7FDCFA16FEF3D1E'
+    COMPANY_NAME = os.environ.get('COMPANY_NAME') or 'ACME'
+    EXTRA_ACTIVE = False
+    EXTRA_TAB = os.environ.get('EXTRA_TAB') or 'Extra'
+    TABLE_DESCRIPTION_ACTIVE = False
+    TABLE_DESCRIPTION_SERVICE = 'dashboard.service.glue_description_service.GlueDescriptionService'
+    GLUE_REGION_NAME = 'us-east-1'
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
